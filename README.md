@@ -6,11 +6,16 @@ including features that the stock ESPHome `gree` climate component does not expo
 | Feature | Entity | Notes |
 |---|---|---|
 | Mode / fan / swing / temperature | `climate` entity | stock ESPHome `gree` platform |
-| **Eco / "Save Energy" (SE)** | template button | official Gree Econo bit (byte 7, bit 2) |
-| **DRED d2 — 50% power cap** | template button | demand-response power limitation |
-| **DRED d3 — 75% power cap** | template button | demand-response power limitation |
-| DRED off | template button | clears power limitation |
+| **Eco / "Save Energy" (SE)** | **preset `Eco`** | official Gree Econo bit (byte 7, bit 2) |
+| **DRED d2 — 50% power cap** | **preset `Away`** | demand-response power limitation |
+| **DRED d3 — 75% power cap** | **preset `Boost`** | demand-response power limitation |
+| DRED/eco off | **preset `None`** | normal operation |
 | Raw IR capture (learning) | `remote_receiver` | dumps any remote frame as Pronto |
+
+Presets live **inside the climate card** and follow the current temperature setting —
+the component is a fork of ESPHome's built-in `gree` platform (see `components/gree/`),
+pulled automatically via `external_components`. Standalone Pronto buttons (no custom
+component) are still available in [`examples/buttons-fallback.yaml`](examples/buttons-fallback.yaml).
 
 No cloud, no vendor app, no WiFi module inside the AC — one ESP32-C3 board with an
 IR LED and a TL1838 receiver, mounted with line of sight to the indoor unit.
@@ -60,9 +65,10 @@ python3 tools/gree_ir_builder.py --temp 26 --dred d2
 
 ## Troubleshooting quick hits
 
-- **No beep on DRED buttons** → Eco (SE) is active. SE and DRED are mutually
-  exclusive on these units; the bundled buttons already sequence around it
-  (send SE-off, wait 600 ms, then the DRED burst).
+- **DRED ignored while Eco is active** → SE and DRED are mutually exclusive, and
+  this AC needs **more than 600 ms** to actually leave Eco. The component waits
+  **3 s** after switching Eco off before sending the DRED burst. If a DRED preset
+  still does nothing, raise `GREE_DRED_SETTLE_DELAY`.
 - **Button "works" but nothing happens** → ESPHome silently refuses malformed
   Pronto data (`Inconsistent data, not sending`). The word count must be exactly
   `4 + 2 × header_count`. Check the log.
@@ -74,6 +80,8 @@ python3 tools/gree_ir_builder.py --temp 26 --dred d2
 
 ## Credits
 
+- Trailing-gap insight: each Gree frame must end with a ~20 ms space, otherwise
+  back-to-back frames (the DRED 2-packet burst) merge on the wire and are ignored.
 - Protocol references and the multi-packet structure: the
   [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) project and
   issue [#1724](https://github.com/crankyoldgit/IRremoteESP8266/issues/1724)

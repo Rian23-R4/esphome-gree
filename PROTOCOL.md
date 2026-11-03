@@ -67,8 +67,16 @@ The indoor display shows `SE`. Cool mode only. Works as a single frame.
 
 ## DRED (power limitation, d1/d2/d3)
 
-The remote's hidden **P** button cycles d3 -> d2 -> off. The level itself is
-carried by a separate near-zero frame ("frame C"), NOT by the state frame:
+The remote's hidden **P** button ("Power Limiting Function" in Gree manuals)
+cycles d3 -> d2 -> off. The levels follow the AS/NZS 4755 demand response modes:
+DRM1 = compressor off, **DRM2 = 50% capacity**, **DRM3 = 75% capacity**
+(source: [Hetech](https://www.hetech.com.au/smarter-energy-brighter-future-powering-australias-sustainable-future/),
+an Australian DRED device manufacturer; the standard caps *compressor capacity* —
+actual watt reduction on inverter units tracks it closely but varies per unit.
+Measure with a power meter if the exact figure matters to you.)
+
+The level itself is carried by a separate near-zero frame ("frame C"), NOT by the
+state frame:
 
 | Level | Frame C bytes | Checksum byte |
 |---|---|---|
@@ -97,7 +105,14 @@ ESPHome YAML:
 
 The physical remote actually sends three frames per keypress ([A, B, C]);
 the shorter [A, C] burst is accepted too. ~35 ms and ~88/162 ms gaps did NOT
-work for us — 40 ms did.
+work for us — 40 ms did. Each frame must also end with a ~20 ms trailing space,
+otherwise consecutive frames merge and the AC ignores the burst.
+
+### Eco -> DRED transition timing
+
+The AC needs **more than 600 ms** to actually leave Eco before it will accept a
+DRED burst (3 s used in the component). Sending one right after a 600 ms pause
+looks correct on the wire but is silently ignored.
 
 ### Mutual exclusion with Eco (SE)
 
